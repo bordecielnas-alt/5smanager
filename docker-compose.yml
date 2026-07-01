@@ -2,12 +2,7 @@ services:
   5sproject:
     # Pour utiliser l'image pré-construite par GitHub Actions :
     # image: ghcr.io/bordecielnas-alt/5sproject-dev:latest
-    build:
-      context: .
-      args:
-        VITE_SUPABASE_URL: "${VITE_SUPABASE_URL}"
-        VITE_SUPABASE_PUBLISHABLE_KEY: "${VITE_SUPABASE_PUBLISHABLE_KEY}"
-        VITE_SUPABASE_PROJECT_ID: "${VITE_SUPABASE_PROJECT_ID}"
+    build: .
     container_name: 5sproject
     restart: unless-stopped
     ports:
@@ -19,5 +14,5 @@ services:
       # Synchronise l'heure système du conteneur avec celle de l'hôte.
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      # Volume persistant (logs, exports, cache applicatif).
+      # Chemin host configurable via .env (DATA_DIR) — persistance SQLite.
       - ${DATA_DIR:-/mnt/user/appdata/5sproject}:/data

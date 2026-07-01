@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,26 +8,24 @@ import { Label } from "@/components/ui/label";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
+import { listAudits } from "@/lib/5s.functions";
 import type { Audit, AuditScore } from "@/lib/5s-types";
 
 type FilterKey = "categories" | "items" | "sites" | "uaps" | "gaps";
 
 export function IndicateursTab() {
+  const fetchList = useServerFn(listAudits);
   const [audits, setAudits] = useState<Audit[]>([]);
   const [scores, setScores] = useState<AuditScore[]>([]);
 
   useEffect(() => {
     void (async () => {
-      const [a, s] = await Promise.all([
-        supabase.from("audits").select("*").order("created_at", { ascending: false }),
-        supabase.from("audit_scores").select("*"),
-      ]);
-      setAudits((a.data ?? []) as Audit[]);
-      setScores((s.data ?? []) as AuditScore[]);
+      const r = await fetchList();
+      setAudits(r.audits as Audit[]);
+      setScores(r.scores as AuditScore[]);
     })();
-  }, []);
+  }, [fetchList]);
 
-  // Build options
   const opts = useMemo(() => {
     const categories = new Set<string>();
     const items = new Set<string>();
@@ -61,7 +59,6 @@ export function IndicateursTab() {
     });
   };
 
-  // Filter scores joined with audits
   const filteredScores = useMemo(() => {
     const auditById = new Map(audits.map((a) => [a.id, a]));
     return scores.filter((s) => {
@@ -76,7 +73,6 @@ export function IndicateursTab() {
     });
   }, [scores, audits, sel]);
 
-  // Build chart data: group by category (or item if items selected)
   const chartData = useMemo(() => {
     const groupBy: "item" | "category" = sel.items.size > 0 ? "item" : "category";
     const map = new Map<string, { name: string; total: number; count: number }>();
@@ -116,7 +112,7 @@ export function IndicateursTab() {
                 )}
                 {audits.map((a) => (
                   <TableRow key={a.id}>
-                    <TableCell className="whitespace-nowrap">{new Date(a.created_at).toLocaleString("fr-FR")}</TableCell>
+                    <TableCell className="whitespace-nowrap">{new Date(a.created_at + "Z").toLocaleString("fr-FR")}</TableCell>
                     <TableCell>{a.auditor_name}</TableCell>
                     <TableCell>{a.site_name ?? "—"}</TableCell>
                     <TableCell>{a.uap_name ?? "—"}</TableCell>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -9,9 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getAll, saveAudit } from "@/lib/5s.functions";
 import type { Site, Uap, Gap, Category, Item } from "@/lib/5s-types";
 
 export function AuditTab() {
+  const fetchAll = useServerFn(getAll);
+  const save = useServerFn(saveAudit);
+
   const [sites, setSites] = useState<Site[]>([]);
   const [uaps, setUaps] = useState<Uap[]>([]);
   const [gaps, setGaps] = useState<Gap[]>([]);
@@ -27,20 +31,11 @@ export function AuditTab() {
 
   useEffect(() => {
     void (async () => {
-      const [s, u, g, c, i] = await Promise.all([
-        supabase.from("sites").select("*").order("name"),
-        supabase.from("uaps").select("*").order("name"),
-        supabase.from("gaps").select("*").order("name"),
-        supabase.from("categories").select("*").order("position"),
-        supabase.from("items").select("*").order("position"),
-      ]);
-      setSites((s.data ?? []) as Site[]);
-      setUaps((u.data ?? []) as Uap[]);
-      setGaps((g.data ?? []) as Gap[]);
-      setCategories((c.data ?? []) as Category[]);
-      setItems((i.data ?? []) as Item[]);
+      const r = await fetchAll();
+      setSites(r.sites); setUaps(r.uaps); setGaps(r.gaps);
+      setCategories(r.categories); setItems(r.items);
     })();
-  }, []);
+  }, [fetchAll]);
 
   const filteredUaps = useMemo(() => uaps.filter((u) => u.site_id === siteId), [uaps, siteId]);
   const filteredGaps = useMemo(() => gaps.filter((g) => g.uap_id === uapId), [gaps, uapId]);
@@ -75,9 +70,7 @@ export function AuditTab() {
 
   const reset = () => {
     setScores({});
-    setSiteId("");
-    setUapId("");
-    setGapId("");
+    setSiteId(""); setUapId(""); setGapId("");
   };
 
   const handleSave = async () => {
@@ -90,9 +83,18 @@ export function AuditTab() {
       const uap = uaps.find((u) => u.id === uapId);
       const gap = gaps.find((g) => g.id === gapId);
 
-      const { data: audit, error: aErr } = await supabase
-        .from("audits")
-        .insert({
+      const rows = items.map((it) => {
+        const cat = categories.find((c) => c.id === it.category_id);
+        return {
+          item_id: it.id,
+          category_name: cat?.name ?? "",
+          item_label: it.label,
+          score: scores[it.id] ?? 0,
+        };
+      });
+
+      await save({
+        data: {
           auditor_name: auditorName.trim(),
           site_id: siteId,
           uap_id: uapId,
@@ -102,23 +104,9 @@ export function AuditTab() {
           gap_name: gap?.name ?? null,
           category_totals: categoryTotals,
           total_score: grandTotal,
-        })
-        .select()
-        .single();
-      if (aErr || !audit) throw aErr ?? new Error("Insert audit failed");
-
-      const rows = items.map((it) => {
-        const cat = categories.find((c) => c.id === it.category_id);
-        return {
-          audit_id: audit.id,
-          item_id: it.id,
-          category_name: cat?.name ?? "",
-          item_label: it.label,
-          score: scores[it.id] ?? 0,
-        };
+          scores: rows,
+        },
       });
-      const { error: sErr } = await supabase.from("audit_scores").insert(rows);
-      if (sErr) throw sErr;
 
       toast.success(`Audit enregistré — Score ${grandTotal}/100`);
       reset();

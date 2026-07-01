@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,52 +7,58 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import {
+  getAll,
+  createSite, updateSite, deleteSite,
+  createUap, updateUap, deleteUap,
+  createGap, updateGap, deleteGap,
+  updateCategory, updateItem,
+} from "@/lib/5s.functions";
 import type { Site, Uap, Gap, Category, Item } from "@/lib/5s-types";
 
 export function ParametrageTab() {
+  const fetchAll = useServerFn(getAll);
+  const fnCreateSite = useServerFn(createSite);
+  const fnUpdateSite = useServerFn(updateSite);
+  const fnDeleteSite = useServerFn(deleteSite);
+  const fnCreateUap = useServerFn(createUap);
+  const fnUpdateUap = useServerFn(updateUap);
+  const fnDeleteUap = useServerFn(deleteUap);
+  const fnCreateGap = useServerFn(createGap);
+  const fnUpdateGap = useServerFn(updateGap);
+  const fnDeleteGap = useServerFn(deleteGap);
+  const fnUpdateCategory = useServerFn(updateCategory);
+  const fnUpdateItem = useServerFn(updateItem);
+
   const [sites, setSites] = useState<Site[]>([]);
   const [uaps, setUaps] = useState<Uap[]>([]);
   const [gaps, setGaps] = useState<Gap[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
 
-  const reload = async () => {
-    const [s, u, g, c, i] = await Promise.all([
-      supabase.from("sites").select("*").order("name"),
-      supabase.from("uaps").select("*").order("name"),
-      supabase.from("gaps").select("*").order("name"),
-      supabase.from("categories").select("*").order("position"),
-      supabase.from("items").select("*").order("position"),
-    ]);
-    setSites((s.data ?? []) as Site[]);
-    setUaps((u.data ?? []) as Uap[]);
-    setGaps((g.data ?? []) as Gap[]);
-    setCategories((c.data ?? []) as Category[]);
-    setItems((i.data ?? []) as Item[]);
-  };
-  useEffect(() => { void reload(); }, []);
+  const reload = useCallback(async () => {
+    const r = await fetchAll();
+    setSites(r.sites); setUaps(r.uaps); setGaps(r.gaps);
+    setCategories(r.categories); setItems(r.items);
+  }, [fetchAll]);
+  useEffect(() => { void reload(); }, [reload]);
+
+  const err = (e: unknown) => toast.error(e instanceof Error ? e.message : "Erreur");
 
   // SITES
   const [newSite, setNewSite] = useState("");
   const [editingSite, setEditingSite] = useState<{ id: string; name: string } | null>(null);
-
   const addSite = async () => {
     if (!newSite.trim()) return;
-    const { error } = await supabase.from("sites").insert({ name: newSite.trim() });
-    if (error) return toast.error(error.message);
-    setNewSite(""); toast.success("Site créé"); reload();
+    try { await fnCreateSite({ data: { name: newSite.trim() } }); setNewSite(""); toast.success("Site créé"); reload(); } catch (e) { err(e); }
   };
   const saveSite = async () => {
     if (!editingSite) return;
-    const { error } = await supabase.from("sites").update({ name: editingSite.name }).eq("id", editingSite.id);
-    if (error) return toast.error(error.message);
-    setEditingSite(null); toast.success("Site mis à jour"); reload();
+    try { await fnUpdateSite({ data: editingSite }); setEditingSite(null); toast.success("Site mis à jour"); reload(); } catch (e) { err(e); }
   };
-  const deleteSite = async (id: string) => {
+  const removeSite = async (id: string) => {
     if (!confirm("Supprimer ce site (et ses UAP/GAP) ?")) return;
-    const { error } = await supabase.from("sites").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Site supprimé"); reload();
+    try { await fnDeleteSite({ data: { id } }); toast.success("Site supprimé"); reload(); } catch (e) { err(e); }
   };
 
   // UAPS
@@ -60,21 +66,15 @@ export function ParametrageTab() {
   const [editingUap, setEditingUap] = useState<{ id: string; name: string } | null>(null);
   const addUap = async () => {
     if (!newUap.name.trim() || !newUap.site_id) return toast.error("Site et nom requis");
-    const { error } = await supabase.from("uaps").insert({ name: newUap.name.trim(), site_id: newUap.site_id });
-    if (error) return toast.error(error.message);
-    setNewUap({ name: "", site_id: "" }); toast.success("UAP créée"); reload();
+    try { await fnCreateUap({ data: { name: newUap.name.trim(), site_id: newUap.site_id } }); setNewUap({ name: "", site_id: "" }); toast.success("UAP créée"); reload(); } catch (e) { err(e); }
   };
   const saveUap = async () => {
     if (!editingUap) return;
-    const { error } = await supabase.from("uaps").update({ name: editingUap.name }).eq("id", editingUap.id);
-    if (error) return toast.error(error.message);
-    setEditingUap(null); reload();
+    try { await fnUpdateUap({ data: editingUap }); setEditingUap(null); reload(); } catch (e) { err(e); }
   };
-  const deleteUap = async (id: string) => {
+  const removeUap = async (id: string) => {
     if (!confirm("Supprimer cette UAP (et ses GAP) ?")) return;
-    const { error } = await supabase.from("uaps").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    reload();
+    try { await fnDeleteUap({ data: { id } }); reload(); } catch (e) { err(e); }
   };
 
   // GAPS
@@ -82,21 +82,15 @@ export function ParametrageTab() {
   const [editingGap, setEditingGap] = useState<{ id: string; name: string } | null>(null);
   const addGap = async () => {
     if (!newGap.name.trim() || !newGap.uap_id) return toast.error("UAP et nom requis");
-    const { error } = await supabase.from("gaps").insert({ name: newGap.name.trim(), uap_id: newGap.uap_id });
-    if (error) return toast.error(error.message);
-    setNewGap({ name: "", uap_id: "" }); toast.success("GAP créé"); reload();
+    try { await fnCreateGap({ data: { name: newGap.name.trim(), uap_id: newGap.uap_id } }); setNewGap({ name: "", uap_id: "" }); toast.success("GAP créé"); reload(); } catch (e) { err(e); }
   };
   const saveGap = async () => {
     if (!editingGap) return;
-    const { error } = await supabase.from("gaps").update({ name: editingGap.name }).eq("id", editingGap.id);
-    if (error) return toast.error(error.message);
-    setEditingGap(null); reload();
+    try { await fnUpdateGap({ data: editingGap }); setEditingGap(null); reload(); } catch (e) { err(e); }
   };
-  const deleteGap = async (id: string) => {
+  const removeGap = async (id: string) => {
     if (!confirm("Supprimer ce GAP ?")) return;
-    const { error } = await supabase.from("gaps").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    reload();
+    try { await fnDeleteGap({ data: { id } }); reload(); } catch (e) { err(e); }
   };
 
   // CATEGORIES & ITEMS
@@ -104,15 +98,11 @@ export function ParametrageTab() {
   const [editingItem, setEditingItem] = useState<{ id: string; label: string } | null>(null);
   const saveCat = async () => {
     if (!editingCat) return;
-    const { error } = await supabase.from("categories").update({ name: editingCat.name }).eq("id", editingCat.id);
-    if (error) return toast.error(error.message);
-    setEditingCat(null); reload();
+    try { await fnUpdateCategory({ data: editingCat }); setEditingCat(null); reload(); } catch (e) { err(e); }
   };
   const saveItem = async () => {
     if (!editingItem) return;
-    const { error } = await supabase.from("items").update({ label: editingItem.label }).eq("id", editingItem.id);
-    if (error) return toast.error(error.message);
-    setEditingItem(null); reload();
+    try { await fnUpdateItem({ data: editingItem }); setEditingItem(null); reload(); } catch (e) { err(e); }
   };
 
   const siteName = (id: string) => sites.find((s) => s.id === id)?.name ?? "—";
@@ -120,7 +110,6 @@ export function ParametrageTab() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {/* SITES */}
       <Card>
         <CardHeader><CardTitle>Sites</CardTitle></CardHeader>
         <CardContent className="space-y-3">
@@ -142,7 +131,7 @@ export function ParametrageTab() {
                   <>
                     <span className="flex-1 truncate text-sm">{s.name}</span>
                     <Button size="icon" variant="ghost" onClick={() => setEditingSite({ id: s.id, name: s.name })}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteSite(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => removeSite(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </>
                 )}
               </li>
@@ -151,7 +140,6 @@ export function ParametrageTab() {
         </CardContent>
       </Card>
 
-      {/* UAPS */}
       <Card>
         <CardHeader><CardTitle>UAP</CardTitle></CardHeader>
         <CardContent className="space-y-3">
@@ -180,7 +168,7 @@ export function ParametrageTab() {
                       <p className="text-xs text-muted-foreground">{siteName(u.site_id)}</p>
                     </div>
                     <Button size="icon" variant="ghost" onClick={() => setEditingUap({ id: u.id, name: u.name })}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteUap(u.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => removeUap(u.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </>
                 )}
               </li>
@@ -189,7 +177,6 @@ export function ParametrageTab() {
         </CardContent>
       </Card>
 
-      {/* GAPS */}
       <Card>
         <CardHeader><CardTitle>GAP</CardTitle></CardHeader>
         <CardContent className="space-y-3">
@@ -218,7 +205,7 @@ export function ParametrageTab() {
                       <p className="text-xs text-muted-foreground">{uapName(g.uap_id)}</p>
                     </div>
                     <Button size="icon" variant="ghost" onClick={() => setEditingGap({ id: g.id, name: g.name })}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteGap(g.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => removeGap(g.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </>
                 )}
               </li>
@@ -227,7 +214,6 @@ export function ParametrageTab() {
         </CardContent>
       </Card>
 
-      {/* CATEGORIES & ITEMS */}
       <Card>
         <CardHeader><CardTitle>Catégories &amp; items</CardTitle></CardHeader>
         <CardContent className="space-y-4">
