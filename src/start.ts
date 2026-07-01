@@ -1,6 +1,7 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -20,5 +21,6 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 // SQLite-backed backend (see src/lib/db.server.ts). Supabase n'est pas utilisé
 // par cette app — on n'enregistre donc PAS attachSupabaseAuth.
 export const startInstance = createStart(() => ({
+  functionMiddleware: [attachSupabaseAuth],
   requestMiddleware: [errorMiddleware],
 }));
