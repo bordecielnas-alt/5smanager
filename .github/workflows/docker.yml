@@ -55,7 +55,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL || 'https://pnjvabtnuynpoymhtcbm.supabase.co' }}
-            VITE_SUPABASE_PUBLISHABLE_KEY=${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_mJjlu_0xVA-JMVnupaphiA_9qZQ0zgl' }}
-            VITE_SUPABASE_PROJECT_ID=${{ vars.VITE_SUPABASE_PROJECT_ID || 'pnjvabtnuynpoymhtcbm' }}
